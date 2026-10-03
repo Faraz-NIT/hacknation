@@ -2,20 +2,25 @@
 import { useEffect, useRef, useState } from "react";
 import { PAUSE_MS } from "@/lib/turnGate";
 import { useDictation } from "@/lib/voice";
+import SkyBuddy from "@/components/SkyBuddy";
 
 export type Line = { role: "user" | "agent" | "system"; text: string; ts_label?: string; off?: boolean; redacted?: boolean };
 
-export function AgentHeader({ kind, connected, speaking, title, accent = "sky" }: {
-  kind: string; connected: boolean; speaking: boolean; title: string; accent?: "sky" | "violet";
+export function AgentHeader({ kind, connected, speaking, title, accent = "sky", paused = false }: {
+  kind: string; connected: boolean; speaking: boolean; title: string; accent?: "sky" | "violet"; paused?: boolean;
 }) {
+  const mood = paused ? "paused" : !connected ? "offline" : speaking ? "speaking" : "listening";
   return (
     <div className="flex items-center gap-3">
-      <div className={`h-9 w-9 rounded-full border-2 ${accent === "sky" ? "border-sky bg-sky/15" : "border-violet bg-violet/15"} ${speaking ? "speaking" : ""}`} />
-      <div>
-        <div className="font-semibold">{title}</div>
+      <SkyBuddy mood={mood} accent={accent} className="agent-buddy" />
+      <div className="min-w-0 flex-1">
+        <div className="font-display text-xl uppercase">{title}</div>
         <div className="text-xs text-mute">
-          {kind === "elevenlabs" ? "ElevenAgents voice" : "Simulated voice (no keys)"} · {connected ? (speaking ? "speaking" : "listening") : "offline"}
+          {kind === "elevenlabs" ? "ElevenAgents voice" : "Browser voice"} · {mood === "paused" ? "off the record" : mood}
         </div>
+      </div>
+      <div className="voice-wave" data-speaking={speaking && !paused && connected} aria-hidden="true">
+        {[0, 1, 2, 3, 4].map((bar) => <span key={bar} style={{ animationDelay: `${bar * 110}ms` }} />)}
       </div>
     </div>
   );
@@ -67,7 +72,10 @@ export function GateMeter({ gate, pending, awaiting, offRecord, micOpen }: {
 
 export function Transcript({ lines }: { lines: Line[] }) {
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }); }, [lines.length]);
+  useEffect(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    end.current?.scrollIntoView({ behavior: reduced ? "instant" : "smooth", block: "nearest" });
+  }, [lines.length]);
   return (
     <div className="max-h-[340px] min-h-[140px] space-y-2 overflow-y-auto pr-1 text-sm">
       {lines.length === 0 && <div className="text-mute">Conversation will appear here. Personal data is redacted before storage.</div>}

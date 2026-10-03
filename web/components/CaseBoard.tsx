@@ -70,7 +70,7 @@ export default function CaseBoard({
       {/* Alternatives */}
       <div>
         <div className="mb-3 flex flex-wrap items-center gap-3"><h2 className="font-display text-2xl uppercase">{c.alternatives.length} alternatives</h2><span className="label">Compare passenger constraints</span></div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="alternatives-grid grid gap-3 sm:grid-cols-2">
         {c.alternatives.map((a) => (
           <Row key={a.id} a={a} c={c} view={view} cheapest={a.id === cheapest} earliest={a.id === earliest}
                readOnly={readOnly} highlight={highlight === a.id} compact={compact} onAction={onAction} />
@@ -84,7 +84,7 @@ export default function CaseBoard({
                   onClick={() => view.selected && onAction?.("confirm", view.selected)}>
             Confirm rebooking {view.selected ? `(${c.alternatives.find((x) => x.id === view.selected)?.label})` : ""}
           </button>
-          {view.confirmed && <span className="chip text-green border-green/40">Rebooked on option {view.confirmed}</span>}
+          {view.confirmed && <span className="chip confirmation-chip text-green border-green/40" role="status">✓ Rebooked on option {view.confirmed}</span>}
         </div>
       )}
     </div>
@@ -113,10 +113,10 @@ function Row({ a, c, view, cheapest, earliest, readOnly, highlight, compact, onA
   const ring = highlight ? "outline outline-2 outline-amber -outline-offset-2 bg-amber/5"
     : selected ? "bg-sky/10" : view.focus === a.id ? "bg-panel-2" : "";
   return (
-    <div className={`alternative-card space-y-3 ${selected ? "selected" : ""} ${view.focus === a.id ? "focused" : ""} ${ring} ${rejected ? "opacity-45" : ""}`}>
+    <div className={`alternative-card space-y-3 ${selected ? "selected" : ""} ${view.focus === a.id ? "focused" : ""} ${ring} ${rejected ? "opacity-45" : ""}`} data-confirmed={view.confirmed === a.id}>
       <div className="flex items-center justify-between">
-        <span className="font-display text-xl">{a.id}</span>
-        {view.confirmed === a.id && <span className="chip text-green">Rebooked</span>}
+        <span className="option-letter font-display text-xl">{a.id}</span>
+        {view.confirmed === a.id ? <span className="chip confirmation-chip text-green">✓ Rebooked</span> : selected && <span className="chip fade-in text-sky">✓ Selected</span>}
       </div>
       {!readOnly && <button type="button" className="label hover:text-sky" onClick={() => onAction?.("inspect", a.id)}>Inspect option {a.id} &rarr;</button>}
       <div>

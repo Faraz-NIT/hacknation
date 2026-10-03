@@ -397,7 +397,7 @@ function Expert() {
 
       <aside className="space-y-3">
         <div className="card apprentice-board space-y-4 p-5">
-          <AgentHeader kind={voice.kind} connected={voice.connected} speaking={voice.agentSpeaking} title="SkyMentor apprentice" />
+          <AgentHeader kind={voice.kind} connected={voice.connected} speaking={voice.agentSpeaking} title="SkyMentor apprentice" paused={offRecord} />
           {phase === "capture" && (
             <GateMeter gate={gate} pending={pending?.text ?? null} awaiting={!!awaiting} offRecord={offRecord} micOpen={voice.kind === "simulated" ? askStage === "listening" : voice.micOpen} />
           )}

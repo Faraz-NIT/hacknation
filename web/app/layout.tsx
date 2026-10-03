@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import Link from "next/link";
+import WorkspaceNav from "@/components/WorkspaceNav";
 
 export const metadata: Metadata = {
   title: "SkyMentor Live",
@@ -17,11 +18,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <span className="grid size-8 place-items-center rounded-full bg-sky text-board font-display text-lg">S</span>
               <span className="font-display text-lg uppercase">SkyMentor Live</span>
             </Link>
-            <nav className="flex gap-4 text-sm text-mute">
-              <Link href="/expert" className="hover:text-text">1 · Capture</Link>
-              <Link href="/workmap" className="hover:text-text">2 · Work Map</Link>
-              <Link href="/trainee" className="hover:text-text">3 · Teach</Link>
-            </nav>
+            <WorkspaceNav />
             <span className="ml-auto hidden font-mono text-[10px] uppercase text-board-foreground/60 md:block">AI Apprentice for disruption operations</span>
           </div>
         </header>

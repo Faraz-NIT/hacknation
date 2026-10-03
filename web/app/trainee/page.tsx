@@ -208,7 +208,7 @@ function Trainee() {
         {mastery && <MasteryCard m={mastery} expertName={expertName} />}
       </section>
       <aside className="space-y-3">
-        <div className="card space-y-3 p-4">
+        <div className="card apprentice-board space-y-3 p-5">
           <AgentHeader kind={voice.kind} connected={voice.connected} speaking={voice.agentSpeaking} title={`Tutor · taught by ${expertName}`} accent="violet" />
           {predicting && voice.kind === "simulated" && (
             <div className="space-y-2">
