@@ -94,17 +94,31 @@ def test_full_loop():
     t = c.post("/api/sessions", json={"mode": "trainee"}).json()
     tid = t["session_id"]
     assert t["expert_session_id"] == sid and t["case"]["case_id"] == "case_B"
+    e = c.post("/api/trainee/answer", json={"session_id": tid, "kind": "explanation",
+                                           "text": "The connection is too short for the checked bag"}).json()
+    assert not e["correct"] and e["rule_id"] is None
     p = c.post("/api/trainee/answer", json={"session_id": tid, "kind": "prediction", "text": "Reykjavik looks risky"}).json()
     assert p["correct"]
     r = c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "A"}).json()
     assert not r["allowed"] and r["violations"][0]["decision_type"] == "connection_risk"
     assert r["violations"][0]["screen_moment"]["option_id"] == "A"
     assert c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "C"}).json()["allowed"] is False
-    assert c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "D"}).json()["allowed"] is False
+    upgrade = c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "D"}).json()
+    assert upgrade["allowed"] is False
+    upgrade_rule_id = upgrade["violations"][0]["rule_id"]
     assert c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "D", "has_supervisor_approval": True}).json()["allowed"]
     e = c.post("/api/trainee/answer", json={"session_id": tid, "kind": "explanation",
                                            "text": "The connection is too short for the checked bag"}).json()
     assert e["correct"]
+    assert e["rule_id"] == conn_rule["rule_id"]
+    # An explicit rule takes priority over a matching earlier intervention.
+    e = c.post("/api/trainee/answer", json={"session_id": tid, "kind": "explanation",
+                                           "rule_id": upgrade_rule_id,
+                                           "text": "The connection is too short for the checked bag"}).json()
+    assert not e["correct"] and e["rule_id"] == upgrade_rule_id
+    e = c.post("/api/trainee/answer", json={"session_id": tid, "kind": "explanation",
+                                           "text": "I don't know"}).json()
+    assert not e["correct"] and e["rule_id"] == upgrade_rule_id
     assert c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "B"}).json()["allowed"]
     m = c.get(f"/api/mastery/{tid}").json()
     assert m["finished"] and len(m["items"]) == 3

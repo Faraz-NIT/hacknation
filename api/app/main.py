@@ -526,9 +526,15 @@ def trainee_answer(body: TraineeAnswerIn):
         return {"matched_rules": hits, "correct": bool(hits)}
     rule_id = body.rule_id
     if rule_id is None:
-        last = db.one("SELECT json FROM interventions WHERE session_id=? ORDER BY ts DESC LIMIT 1", (body.session_id,))
-        ids = db.loads(last["json"])["rule_ids"] if last else []
-        rule_id = ids[0] if ids else None
+        blocks = db.query("SELECT json FROM interventions WHERE session_id=? ORDER BY ts DESC, rowid DESC", (body.session_id,))
+        ids = list(dict.fromkeys(rid for block in blocks
+                                 for rid in db.loads(block["json"]).get("rule_ids", [])))
+        # An answer without an explicit target can refer to an earlier block.
+        # Match only rules actually encountered, keeping the latest for feedback
+        # when the explanation does not match any of them.
+        rule_id = next((rid for rid in ids
+                        if any(r.rule_id == rid and tutor.judge_answer(text, r) for r in rules)),
+                       ids[0] if ids else None)
     rule = next((r for r in rules if r.rule_id == rule_id), None)
     correct = bool(rule and tutor.judge_answer(text, rule))
     state.setdefault("explanations", []).append({"rule_id": rule_id, "text": text, "correct": correct})
