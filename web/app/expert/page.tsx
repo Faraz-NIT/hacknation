@@ -370,7 +370,7 @@ function Expert() {
 
   const c = session!.case;
   return (
-    <div className="grid gap-5 lg:grid-cols-[1fr_400px]">
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,2fr)_minmax(320px,1fr)]">
       <section className="space-y-3">
         <div className="flex flex-wrap items-center gap-3">
           <div>
@@ -396,7 +396,7 @@ function Expert() {
       </section>
 
       <aside className="space-y-3">
-        <div className="card space-y-3 p-4">
+        <div className="card apprentice-board space-y-4 p-5">
           <AgentHeader kind={voice.kind} connected={voice.connected} speaking={voice.agentSpeaking} title="SkyMentor apprentice" />
           {phase === "capture" && (
             <GateMeter gate={gate} pending={pending?.text ?? null} awaiting={!!awaiting} offRecord={offRecord} micOpen={voice.kind === "simulated" ? askStage === "listening" : voice.micOpen} />

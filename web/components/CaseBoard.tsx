@@ -13,12 +13,6 @@ export const emptyView = (): BoardView => ({ selected: null, rejected: [], escal
 
 type Action = "inspect" | "reject" | "select" | "escalate" | "confirm" | "unreject";
 
-const cols = (readOnly: boolean, compact: boolean) =>
-  readOnly
-    ? (compact ? "grid-cols-[minmax(130px,1.6fr)_minmax(80px,0.9fr)_0.8fr_0.7fr_0.8fr_0.5fr_0px]"
-               : "grid-cols-[minmax(170px,1.7fr)_minmax(90px,0.9fr)_0.8fr_0.7fr_0.8fr_0.7fr_96px]")
-    : "grid-cols-[minmax(170px,1.7fr)_minmax(90px,0.9fr)_0.8fr_0.7fr_0.8fr_0.7fr_292px]";
-
 const CABIN: Record<string, string> = { economy: "Economy", premium_economy: "Premium Eco", business: "Business", first: "First" };
 
 function Provenance({ label }: { label?: string }) {
@@ -42,9 +36,11 @@ export default function CaseBoard({
   return (
     <div className={`space-y-3 ${compact ? "text-[13px]" : ""}`}>
       {/* Disruption banner */}
-      <div className={`card ${pad} flex flex-wrap items-center gap-x-6 gap-y-2`}>
+      <div className={`card disruption-hero ${pad} flex flex-wrap items-center gap-x-6 gap-y-2`}>
+        <span className="route-watermark" aria-hidden="true">{c.destination}</span>
         <div>
           <div className="label">Disruption</div>
+          <div className="route-title">{c.origin} <span className="text-sky">&rarr;</span> {c.destination}</div>
           <div className="font-semibold">
             <span className="num">{c.flight.number}</span> · {c.flight.disrupted_leg}{" "}
             <span className={`chip ml-1 ${c.flight.status === "cancelled" ? "text-red border-red/40" : "text-amber border-amber/40"}`}>
@@ -72,14 +68,14 @@ export default function CaseBoard({
       </div>
 
       {/* Alternatives */}
-      <div className="card overflow-hidden">
-        <div className={`grid ${cols(readOnly, compact)} gap-2 border-b border-line ${compact ? "px-3 py-2" : "px-4 py-2.5"} label`}>
-          <div>Routing</div><div>Times</div><div>Connection</div><div>Fare</div><div>Cabin</div><div>Hub wx</div><div />
-        </div>
+      <div>
+        <div className="mb-3 flex flex-wrap items-center gap-3"><h2 className="font-display text-2xl uppercase">{c.alternatives.length} alternatives</h2><span className="label">Compare passenger constraints</span></div>
+        <div className="grid gap-3 sm:grid-cols-2">
         {c.alternatives.map((a) => (
           <Row key={a.id} a={a} c={c} view={view} cheapest={a.id === cheapest} earliest={a.id === earliest}
                readOnly={readOnly} highlight={highlight === a.id} compact={compact} onAction={onAction} />
         ))}
+        </div>
       </div>
 
       {!readOnly && !compact && (
@@ -117,25 +113,31 @@ function Row({ a, c, view, cheapest, earliest, readOnly, highlight, compact, onA
   const ring = highlight ? "outline outline-2 outline-amber -outline-offset-2 bg-amber/5"
     : selected ? "bg-sky/10" : view.focus === a.id ? "bg-panel-2" : "";
   return (
-    <div onClick={() => !readOnly && onAction?.("inspect", a.id)}
-         className={`grid ${cols(readOnly, compact)} items-center gap-2 border-b border-line last:border-0 ${compact ? "px-3 py-2" : "px-4 py-3"} ${ring} ${rejected ? "opacity-45" : ""} ${readOnly ? "" : "cursor-pointer"}`}>
+    <div className={`alternative-card space-y-3 ${selected ? "selected" : ""} ${view.focus === a.id ? "focused" : ""} ${ring} ${rejected ? "opacity-45" : ""}`}>
+      <div className="flex items-center justify-between">
+        <span className="font-display text-xl">{a.id}</span>
+        {view.confirmed === a.id && <span className="chip text-green">Rebooked</span>}
+      </div>
+      {!readOnly && <button type="button" className="label hover:text-sky" onClick={() => onAction?.("inspect", a.id)}>Inspect option {a.id} &rarr;</button>}
       <div>
-        <div className="font-semibold">
+        <div className="font-display text-2xl">
           <span className="num text-mute">{a.id}</span> {c.origin} → {a.hub !== "-" ? `${a.hub} → ` : ""}{c.destination}
         </div>
         {rejected && <span className="chip my-0.5 text-[9px] text-red border-red/40">RULED OUT</span>}
         <div className="text-xs text-mute">{a.carrier}{a.alliance ? ` · ${a.alliance}` : ""}{a.note ? ` · ${a.note}` : ""}</div>
       </div>
+      <div className="grid grid-cols-2 gap-2 font-mono text-xs">
       <div className="num leading-tight">
         <div className="text-[11px] text-mute">dep {a.departure}</div>
         <div><b>arr {a.arrival}</b></div>
         {earliest && <div className="text-[10px] font-semibold text-sky">EARLIEST</div>}
       </div>
-      <div className="num">{a.hub === "-" ? "nonstop" : `${a.connection_min} min`}</div>
+      <div className="num"><span className="label block">Connection</span>{a.hub === "-" ? "nonstop" : `${a.connection_min} min`}</div>
       <div className="num">€{a.price_eur}{cheapest && <div className="text-[10px] font-semibold text-green">CHEAPEST</div>}</div>
-      <div>{CABIN[a.cabin] ?? a.cabin}</div>
+      <div><span className="label block">Cabin</span>{CABIN[a.cabin] ?? a.cabin}</div>
       <div className="text-xs">{wx ? <span className={wx.risk === "normal" ? "text-mute" : "text-amber"}>{wx.risk} · {wx.wind_kph} km/h</span> : <span className="text-mute">—</span>}</div>
-      <div className={`flex justify-end gap-1.5 ${readOnly && compact ? "hidden" : ""}`} onClick={(e) => e.stopPropagation()}>
+      </div>
+      <div className={`flex flex-wrap justify-end gap-1.5 ${readOnly && compact ? "hidden" : ""}`} onClick={(e) => e.stopPropagation()}>
         {readOnly ? (
           <div className="flex gap-1">
             {selected && <span className="chip text-sky border-sky/40">SELECTED</span>}

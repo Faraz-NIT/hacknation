@@ -20,20 +20,20 @@ export default function Home() {
 
   return (
     <div className="space-y-8">
-      <section className="pt-6">
+      <section className="disruption-hero rounded-3xl">
         <div className="label">Hack-Nation × ElevenLabs · The AI Apprentice</div>
-        <h1 className="mt-2 max-w-3xl text-4xl font-bold leading-tight">
+        <h1 className="mt-2 max-w-3xl font-display text-4xl uppercase leading-tight sm:text-6xl">
           Real-time APIs provide the facts. The expert provides the judgment. <span className="text-sky">SkyMentor captures the why.</span>
         </h1>
       </section>
 
       <section className="grid gap-4 md:grid-cols-3">
         {MODULES.map((m) => (
-          <Link key={m.n} href={m.href} className="card group p-5 transition hover:border-sky">
+          <Link key={m.n} href={m.href} className="card group p-6 transition hover:border-sky">
             <div className="flex items-baseline gap-3">
               <span className="num text-3xl font-semibold text-sky">{m.n}</span>
               <div>
-                <div className="text-lg font-bold">{m.title}</div>
+                <div className="font-display text-3xl uppercase">{m.title}</div>
                 <div className="label">{m.sub}</div>
               </div>
             </div>
