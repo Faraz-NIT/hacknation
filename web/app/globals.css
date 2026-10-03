@@ -1,0 +1,42 @@
+@import url("https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+
+  --color-ink: #0b1220;        /* page */
+  --color-panel: #111a2b;      /* cards */
+  --color-panel-2: #172238;    /* raised */
+  --color-line: #24324d;       /* borders */
+  --color-mute: #8494b2;       /* secondary text */
+  --color-text: #e6ecf7;
+  --color-sky: #5cc8ff;        /* primary / agent */
+  --color-amber: #ffb547;      /* attention / question */
+  --color-red: #ff5d6c;        /* guardrail block */
+  --color-green: #3ddc97;      /* confirmed / ok */
+  --color-violet: #a98bff;     /* tutor */
+}
+
+html, body { background: var(--color-ink); color: var(--color-text); }
+body { font-family: var(--font-sans); -webkit-font-smoothing: antialiased; }
+.num { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+
+.card { background: var(--color-panel); border: 1px solid var(--color-line); border-radius: 12px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 2px 10px;
+        font-size: 11px; font-weight: 600; letter-spacing: .02em; border: 1px solid var(--color-line); }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border-radius: 8px;
+       padding: 8px 14px; font-weight: 600; font-size: 14px; border: 1px solid var(--color-line);
+       background: var(--color-panel-2); white-space: nowrap; transition: background .15s, border-color .15s, opacity .15s; }
+.btn:hover { border-color: var(--color-mute); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-primary { background: var(--color-sky); color: #04121f; border-color: var(--color-sky); }
+.btn-primary:hover { background: #8bd8ff; }
+.btn-danger { background: transparent; color: var(--color-red); border-color: #5a2731; }
+.btn-ghost { background: transparent; }
+.label { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--color-mute); font-weight: 600; }
+
+@keyframes pulse-ring { 0% { box-shadow: 0 0 0 0 rgba(92,200,255,.5);} 100% { box-shadow: 0 0 0 12px rgba(92,200,255,0);} }
+.speaking { animation: pulse-ring 1.2s infinite; }
+@keyframes fade-in { from { opacity: 0; transform: translateY(4px);} to { opacity: 1; transform: none;} }
+.fade-in { animation: fade-in .25s ease-out; }

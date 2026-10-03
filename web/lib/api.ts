@@ -1,0 +1,93 @@
+export const API = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export type Alternative = {
+  id: string; label: string; hub: string; hub_city: string; carrier: string; alliance: string;
+  departure: string; arrival: string; connection_min: number; price_eur: number; cabin: string;
+  seats_left?: number | null; note?: string | null;
+};
+export type Case = {
+  case_id: string; title: string; briefing: string; origin: string; destination: string;
+  flight: { number: string; route: string; disrupted_leg: string; status: string; delay_min?: number | null; source: string };
+  passenger: { name: string; pnr: string; checked_bag: boolean; arrival_deadline: string; deadline_reason: string;
+               original_cabin: string; tier: string; email?: string; phone?: string };
+  alternatives: Alternative[];
+  weather: Record<string, { risk: string; wind_kph: number; gust_kph?: number; temp_c?: number; source: string }>;
+  market: Record<string, unknown>[];
+  provenance: Record<string, string>;
+};
+export type Session = { session_id: string; mode: "expert" | "trainee"; expert_session_id: string | null;
+                        state: Record<string, any>; case: Case };
+export type Question = { id: string; text: string; category: string; is_guardrail: boolean; event_id: string };
+export type Score = { q: number; features: Record<string, number>; hypotheses: string[]; ask: boolean;
+                      question: string | null; category: string | null; is_guardrail: boolean; reasons: string[] };
+export type EventResp = { event_id: string; ts: number; ts_label: string; off_record: boolean; score: Score; question: Question | null };
+export type Rule = {
+  rule_id: string; decision_type: string; title: string; condition: Record<string, unknown>; action: string;
+  reason: string; guardrail: string | null; threshold_min: number | null; escalation: string | null;
+  exception: string | null; source_event_id: string | null; source_ts: number | null;
+  source_transcript_span: string | null; quote: string | null; confidence: number;
+  expert_confirmed: boolean; corrections: number; extracted_by: string; notes: string[];
+};
+export type Gap = { gap_id: string; question: string; mandatory: boolean; category: string; rule_id: string | null; field: string | null };
+export type Debrief = { gaps: Gap[]; mandatory_open: number; answered: number; min_questions: number;
+                        ready_for_teachback: boolean; teachback: string | null; teachback_confirmed: boolean;
+                        complete: boolean; corrections: number };
+export type ScreenMoment = { event_id: string; type: string; option_id: string | null; ts: number; ts_label: string; snapshot: Snapshot };
+export type Intervention = { rule_id: string; decision_type: string; title: string; guardrail: string | null; why: string;
+                             expert_quote: string; expert_span: string | null; screen_moment: ScreenMoment | null;
+                             tutor_script: string; reveal_script: string; confirmed: boolean };
+export type Snapshot = { case_id?: string; selected?: string | null; rejected?: string[]; escalated?: string[];
+                         focus?: string | null; alternatives?: Alternative[]; passenger?: Record<string, unknown>;
+                         flight?: Case["flight"]; origin?: string; destination?: string };
+
+async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const r = await fetch(`${API}${path}`, {
+    ...init,
+    headers: { "content-type": "application/json", ...(init?.headers || {}) },
+    cache: "no-store",
+  });
+  if (!r.ok) {
+    let detail = r.statusText;
+    try { detail = (await r.json()).detail ?? detail; } catch {}
+    throw new ApiError(r.status, String(detail));
+  }
+  const ct = r.headers.get("content-type") || "";
+  return (ct.includes("json") ? r.json() : r.text()) as Promise<T>;
+}
+export class ApiError extends Error { constructor(public status: number, msg: string) { super(msg); } }
+
+const post = <T,>(path: string, body: unknown) => req<T>(path, { method: "POST", body: JSON.stringify(body) });
+
+export const api = {
+  health: () => req<{ ok: boolean; integrations: Record<string, boolean>; offline: boolean }>("/api/health"),
+  reset: () => post("/api/reset", {}),
+  warm: () => post<Record<string, Record<string, string>>>("/api/cache/warm", {}),
+  createSession: (body: { mode: "expert" | "trainee"; expert_name?: string; live?: boolean; expert_session_id?: string }) =>
+    post<Session>("/api/sessions", body),
+  latest: (mode = "expert") => req<Session>(`/api/sessions/latest?mode=${mode}`),
+  session: (id: string) => req<Session>(`/api/sessions/${id}`),
+  context: (id: string) => req<{ text: string; mode: string; expert_name?: string; rules_text?: string }>(`/api/sessions/${id}/context`),
+  offRecord: (id: string, on: boolean) => post<{ off_record: boolean; ts: number }>(`/api/sessions/${id}/off_record`, { on }),
+  event: (body: { session_id: string; type: string; option_id?: string | null; snapshot?: Snapshot; detail?: object; off_record?: boolean }) =>
+    post<EventResp>("/api/events", body),
+  asked: (qid: string) => post<{ asked_ts: number; ts_label: string }>(`/api/questions/${qid}/asked`, {}),
+  logQuestion: (session_id: string, text: string, phase = "debrief", category = "debrief") =>
+    post("/api/questions", { session_id, text, phase, category }),
+  transcript: (session_id: string, role: "user" | "agent" | "system", text: string, off_record = false) =>
+    post<{ ts: number; ts_label: string; text: string; off_record: boolean; redacted: boolean }>("/api/transcript", { session_id, role, text, off_record }),
+  extract: (session_id: string, text: string) => post<{ rules: Rule[]; unresolved: boolean }>("/api/rules/extract", { session_id, text }),
+  recordRule: (body: Record<string, unknown>) => post<Rule>("/api/rules/record", body),
+  rules: (id: string) => req<Rule[]>(`/api/rules/${id}`),
+  correct: (body: Record<string, unknown>) => post<{ rule: Rule; debrief: Debrief }>("/api/rules/correct", body),
+  debrief: (id: string) => req<Debrief>(`/api/debrief/${id}`),
+  answerGap: (body: Record<string, unknown>) => post<{ resolved: boolean; debrief: Debrief }>("/api/debrief/answer", body),
+  confirm: (session_id: string) => post<Debrief>("/api/debrief/confirm", { session_id }),
+  workmap: (id: string) => req<any>(`/api/workmap/${id}`),
+  exportMd: (id: string) => req<string>(`/api/workmap/${id}/export`),
+  evaluate: (body: { session_id: string; option_id: string; type?: "confirm" | "select"; has_supervisor_approval?: boolean }) =>
+    post<{ allowed: boolean; violations: Intervention[]; warnings: Intervention[]; facts: Record<string, unknown> }>("/api/guardrails/evaluate", body),
+  traineeAnswer: (body: { session_id: string; kind: "prediction" | "explanation"; text: string; rule_id?: string | null }) =>
+    post<{ correct: boolean; matched_rules?: string[]; feedback?: string; rule_id?: string }>("/api/trainee/answer", body),
+  mastery: (id: string) => req<any>(`/api/mastery/${id}`),
+  elevenlabs: (mode: string) => req<{ available: boolean; signed_url?: string; agent_id?: string; reason?: string; warning?: string }>(`/api/elevenlabs/session?mode=${mode}`),
+};

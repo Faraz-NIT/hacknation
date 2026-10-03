@@ -1,0 +1,40 @@
+{
+  "case_id": "case_A",
+  "title": "LH716 FRA-HND cancelled, passenger stranded on CDG-FRA-HND itinerary",
+  "briefing": "Passenger's onward Frankfurt-Tokyo Haneda flight is cancelled. Find a new routing from Paris CDG to Tokyo Haneda.",
+  "origin": "CDG",
+  "destination": "HND",
+  "flight": {
+    "number": "LH716",
+    "route": "CDG -> FRA -> HND",
+    "disrupted_leg": "FRA -> HND",
+    "status": "cancelled",
+    "delay_min": null,
+    "scheduled_arrival": "06:55",
+    "source": "fixture"
+  },
+  "passenger": {
+    "name": "Maria Chen",
+    "pnr": "K7QZ4M",
+    "checked_bag": true,
+    "arrival_deadline": "10:00",
+    "deadline_reason": "Contract signing in Minato at 11:00, must land by 10:00",
+    "original_cabin": "economy",
+    "tier": "Silver",
+    "email": "maria.chen@example.com",
+    "phone": "+33 6 12 34 56 78"
+  },
+  "alternatives": [
+    {"id": "A", "label": "via Doha", "hub": "DOH", "hub_city": "Doha", "carrier": "Qatar Airways", "alliance": "oneworld",
+     "departure": "10:05", "arrival": "07:40", "connection_min": 55, "price_eur": 812, "cabin": "economy", "seats_left": 4},
+    {"id": "B", "label": "via London", "hub": "LHR", "hub_city": "London Heathrow", "carrier": "British Airways", "alliance": "oneworld",
+     "departure": "09:20", "arrival": "08:25", "connection_min": 105, "price_eur": 935, "cabin": "economy", "seats_left": 7},
+    {"id": "C", "label": "via Helsinki", "hub": "HEL", "hub_city": "Helsinki", "carrier": "Finnair", "alliance": "oneworld",
+     "departure": "11:40", "arrival": "10:25", "connection_min": 80, "price_eur": 740, "cabin": "economy", "seats_left": 12},
+    {"id": "D", "label": "via Amsterdam", "hub": "AMS", "hub_city": "Amsterdam", "carrier": "KLM", "alliance": "SkyTeam",
+     "departure": "09:50", "arrival": "08:55", "connection_min": 90, "price_eur": 1180, "cabin": "business", "seats_left": 2,
+     "note": "Economy sold out, business only"}
+  ],
+  "weather": {},
+  "provenance": {}
+}

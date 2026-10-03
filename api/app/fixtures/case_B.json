@@ -1,0 +1,40 @@
+{
+  "case_id": "case_B",
+  "title": "AF1240 CDG-AMS delayed 3h, onward AMS-JFK connection missed",
+  "briefing": "Inbound delay breaks the Amsterdam connection to New York JFK. Find a new routing from Paris CDG to JFK.",
+  "origin": "CDG",
+  "destination": "JFK",
+  "flight": {
+    "number": "AF1240",
+    "route": "CDG -> AMS -> JFK",
+    "disrupted_leg": "CDG -> AMS",
+    "status": "delayed",
+    "delay_min": 185,
+    "scheduled_arrival": "13:50",
+    "source": "fixture"
+  },
+  "passenger": {
+    "name": "Lucas Moreau",
+    "pnr": "P3HX9T",
+    "checked_bag": true,
+    "arrival_deadline": "18:00",
+    "deadline_reason": "Connecting to a 19:30 Amtrak to Boston, must land by 18:00",
+    "original_cabin": "economy",
+    "tier": "none",
+    "email": "lucas.moreau@example.com",
+    "phone": "+33 7 98 76 54 32"
+  },
+  "alternatives": [
+    {"id": "A", "label": "via Reykjavik", "hub": "KEF", "hub_city": "Reykjavik", "carrier": "Icelandair", "alliance": "",
+     "departure": "13:10", "arrival": "15:10", "connection_min": 48, "price_eur": 690, "cabin": "economy", "seats_left": 3},
+    {"id": "B", "label": "via Dublin", "hub": "DUB", "hub_city": "Dublin", "carrier": "Aer Lingus", "alliance": "",
+     "departure": "12:35", "arrival": "16:05", "connection_min": 95, "price_eur": 760, "cabin": "economy", "seats_left": 9},
+    {"id": "C", "label": "via London", "hub": "LHR", "hub_city": "London Heathrow", "carrier": "British Airways", "alliance": "oneworld",
+     "departure": "14:15", "arrival": "18:40", "connection_min": 120, "price_eur": 720, "cabin": "economy", "seats_left": 14},
+    {"id": "D", "label": "Nonstop", "hub": "-", "hub_city": "Nonstop", "carrier": "Air France", "alliance": "SkyTeam",
+     "departure": "14:30", "arrival": "17:20", "connection_min": 0, "price_eur": 1290, "cabin": "premium_economy", "seats_left": 1,
+     "note": "Economy sold out, premium economy only"}
+  ],
+  "weather": {},
+  "provenance": {}
+}
