@@ -1,0 +1,18 @@
+INFO:     Started server process [17588]
+INFO:     Waiting for application startup.
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+2026-10-03 23:26:07,203 INFO GET /api/health 200 4ms
+2026-10-03 23:26:46,589 INFO OPTIONS /api/health 200 0ms
+2026-10-03 23:26:46,593 INFO GET /api/health 200 1ms
+2026-10-03 23:26:59,974 INFO OPTIONS /api/cache/warm 200 1ms
+2026-10-03 23:27:00,011 INFO POST /api/cache/warm 200 28ms
+2026-10-03 23:27:08,230 INFO OPTIONS /api/health 200 0ms
+2026-10-03 23:27:08,257 INFO GET /api/health 200 1ms
+2026-10-03 23:27:14,279 INFO OPTIONS /api/sessions 200 0ms
+2026-10-03 23:27:14,327 INFO POST /api/sessions 200 43ms
+2026-10-03 23:27:14,330 INFO OPTIONS /api/events 200 0ms
+2026-10-03 23:27:14,338 INFO event S_99d29f4c case_opened None q=None ask=None
+2026-10-03 23:27:14,339 INFO POST /api/events 200 6ms
+2026-10-03 23:27:16,010 INFO OPTIONS /api/transcript 200 0ms
+2026-10-03 23:27:16,019 INFO POST /api/transcript 200 6ms

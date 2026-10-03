@@ -1,0 +1,13 @@
+INFO:     127.0.0.1:58511 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64179 - "OPTIONS /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64179 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:52337 - "OPTIONS /api/cache/warm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54760 - "POST /api/cache/warm HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56201 - "OPTIONS /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:56201 - "GET /api/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61041 - "OPTIONS /api/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63342 - "POST /api/sessions HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63342 - "OPTIONS /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61041 - "POST /api/events HTTP/1.1" 200 OK
+INFO:     127.0.0.1:61041 - "OPTIONS /api/transcript HTTP/1.1" 200 OK
+INFO:     127.0.0.1:63342 - "POST /api/transcript HTTP/1.1" 200 OK

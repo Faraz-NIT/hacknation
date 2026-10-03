@@ -1,0 +1,21 @@
+
+> skymentor-web@0.1.0 dev
+> next dev -p 3000
+
+▲ Next.js 16.3.8 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.1.47:3000
+✓ Ready in 6.3s
+✓ Running next.config.mjs took 32ms
+Attention: Next.js now collects completely anonymous telemetry regarding usage.
+This information is used to shape Next.js' roadmap and prioritize features.
+You can learn more, including how to opt-out if you'd not like to participate in this anonymous program, by visiting the following URL:
+https://nextjs.org/telemetry
+
+Creating turbopack project { dir: 'C:\\Users\\faraz\\Downloads\\hacknation\\web', testMode: true }
+
+✓ Generated AGENTS.md and CLAUDE.md for AI agents. Set `agentRules: false` in next.config to disable.
+○ Compiling / ...
+ GET / 200 in 8.3s (next.js: 8.0s, application-code: 296ms)
+ GET / 200 in 66ms (next.js: 16ms, application-code: 51ms)
+ GET /expert 200 in 1697ms (next.js: 1665ms, application-code: 33ms)
