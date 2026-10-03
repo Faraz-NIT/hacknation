@@ -46,7 +46,7 @@ log = logging.getLogger("skymentor")
 app = FastAPI(title="SkyMentor Live API", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.environ.get("CORS_ORIGINS", "*").split(","),
+    allow_origins=[o.strip() for o in (os.environ.get("CORS_ORIGINS") or "*").split(",") if o.strip()],
     allow_methods=["*"],
     allow_headers=["*"],
 )
