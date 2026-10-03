@@ -4,7 +4,7 @@ import tempfile
 
 os.environ["SKYMENTOR_OFFLINE"] = "1"
 os.environ["SKYMENTOR_DATA_DIR"] = tempfile.mkdtemp()
-os.environ.pop("ANTHROPIC_API_KEY", None)
+os.environ.pop("CEREBRAS_API_KEY", None)
 
 from fastapi.testclient import TestClient  # noqa: E402
 

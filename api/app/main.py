@@ -82,7 +82,7 @@ def health():
         "integrations": {
             "elevenlabs": bool(os.environ.get("ELEVENLABS_API_KEY") and _agent_id("expert")) or bool(_agent_id("expert")),
             "elevenlabs_signed": bool(os.environ.get("ELEVENLABS_API_KEY")),
-            "anthropic_extraction": bool(os.environ.get("ANTHROPIC_API_KEY")),
+            "cerebras_extraction": bool(os.environ.get("CEREBRAS_API_KEY")),
             "aviationstack": bool(os.environ.get("AVIATIONSTACK_KEY")),
             "brightdata": bool(os.environ.get("BRIGHTDATA_API_TOKEN") and os.environ.get("BRIGHTDATA_FLIGHTS_DATASET_ID")),
             "open_meteo": os.environ.get("SKYMENTOR_OFFLINE") != "1",

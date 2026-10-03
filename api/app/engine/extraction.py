@@ -3,7 +3,7 @@
 Primary path in voice mode: the ElevenLabs agent itself fills the
 `record_expert_rule` client-tool schema (the agent's LLM does the extraction).
 This module is the backend path used by the simulated agent, by
-POST /rules/extract and as a backfill. It uses an LLM when ANTHROPIC_API_KEY is
+POST /rules/extract and as a backfill. It uses a Cerebras-hosted LLM when CEREBRAS_API_KEY is
 set and a deterministic heuristic otherwise; every output is Pydantic-validated.
 """
 from __future__ import annotations
@@ -167,23 +167,25 @@ Never invent thresholds, people or exceptions that were not said."""
 
 
 def llm_extract(text: str, context: str = "") -> Optional[list[RuleProposal]]:
-    key = os.environ.get("ANTHROPIC_API_KEY")
+    key = os.environ.get("CEREBRAS_API_KEY")
     if not key:
         return None
     try:
         r = httpx.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": key, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            "https://api.cerebras.ai/v1/chat/completions",
+            headers={"Authorization": f"Bearer {key}", "content-type": "application/json"},
             json={
-                "model": os.environ.get("ANTHROPIC_MODEL", "claude-haiku-4-5-20251001"),
-                "max_tokens": 600,
-                "system": LLM_SYSTEM,
-                "messages": [{"role": "user", "content": f"Context: {context}\n\nExpert said: {text}"}],
+                "model": os.environ.get("CEREBRAS_MODEL", "gpt-oss-120b"),
+                "max_tokens": 2000,
+                "messages": [
+                    {"role": "system", "content": LLM_SYSTEM},
+                    {"role": "user", "content": f"Context: {context}\n\nExpert said: {text}"},
+                ],
             },
             timeout=12,
         )
         r.raise_for_status()
-        content = "".join(b.get("text", "") for b in r.json().get("content", []))
+        content = r.json()["choices"][0]["message"].get("content") or ""
         payload = json.loads(content[content.find("{"): content.rfind("}") + 1])
         out = []
         for raw in payload.get("rules", []):

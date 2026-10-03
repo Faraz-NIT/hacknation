@@ -41,7 +41,7 @@ Run the backend test of the whole loop: `cd api && python -m pytest -q`.
 | Piece | What to set | Doc |
 |---|---|---|
 | ElevenLabs voice agent | `ELEVENLABS_AGENT_ID` (+ `ELEVENLABS_API_KEY` for a private agent) in `api/.env` | [docs/elevenlabs_setup.md](docs/elevenlabs_setup.md) |
-| LLM rule extraction (backend path) | `ANTHROPIC_API_KEY` | falls back to a deterministic extractor |
+| LLM rule extraction (backend path) | `CEREBRAS_API_KEY` (optional `CEREBRAS_MODEL`) | falls back to a deterministic extractor |
 | Live flight status | `AVIATIONSTACK_KEY` | free plan is HTTP-only / non-commercial |
 | Live public fares | `BRIGHTDATA_API_TOKEN`, `BRIGHTDATA_FLIGHTS_DATASET_ID` | adjust the field mapping in `api/app/services/live.py` to your dataset |
 | Airport weather | nothing (Open-Meteo) | |
