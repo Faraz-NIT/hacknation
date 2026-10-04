@@ -20,7 +20,8 @@ agent covers both roles.
 
 ## 2. Allow overrides
 
-**Agent → Security → Overrides:** enable **System prompt** and **First message**.
+**Agent → Security → Overrides:** enable **System prompt**, **First message** and **Language**
+(Language is needed for French, German or Hindi capture; the voice model must be multilingual).
 
 If you can't or don't want to enable overrides, set `NEXT_PUBLIC_EL_USE_OVERRIDES=0` in
 `web/.env.local`, create a second agent with the *tutor* prompt, and set
@@ -57,6 +58,7 @@ The browser implements them; they call the FastAPI backend. Names must match exa
 | `record_prediction` | `text` string (required) | Trainee's up-front prediction |
 | `record_explanation` | `text` string (required), `rule_id` string | Trainee's explanation after a block |
 | `show_evidence` | `rule_id` string | Reveals the expert's quote and screen replay |
+| `check_guardrail` | `option_id` string (required), `connection_min` number, `arrival` string (HH:MM), `cabin` string, `checked_bag` boolean, `has_supervisor_approval` boolean | "What if" check: runs the expert's guardrails on a hypothetical option. Read-only |
 
 Parameter descriptions for the dashboard can be short, e.g. for `threshold_minutes`:
 *"Number the expert stated, e.g. minimum connection minutes or deadline margin. Omit if not stated."*

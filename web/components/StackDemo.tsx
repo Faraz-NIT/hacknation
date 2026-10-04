@@ -10,7 +10,7 @@ const NODES = [
   { id: "extraction", label: "The learning", tech: "Cerebras · LLM extraction", mark: "✦", detail: "Cerebras is the optional backend extraction path for simulated answers and backfill. In live voice mode, the ElevenLabs agent can record a typed rule directly through its client tool. Python validates both paths.", sample: 'decision_type: connection_risk\nthreshold_min: 75\nexpert_confirmed: false' },
   { id: "api", label: "The orchestration", tech: "Python · FastAPI · Pydantic", mark: "{ }", detail: "FastAPI scores visible decisions, manages sessions and debriefs, redacts passenger data, and validates rule contracts. It owns state and enforcement; the voice model owns conversation.", sample: "Q = .30 novelty + .25 importance\n  + .25 alternative gap + .20 uncertainty" },
   { id: "memory", label: "The evidence", tech: "SQLite · Work Map", mark: "▤", detail: "SQLite stores structured rules alongside the screen event, timestamp, expert quote, and corrections. The Work Map connects each decision to its reasoning. Only expert-confirmed rules can block.", sample: 'rule → event → transcript span → expert quote\nstatus: expert-confirmed' },
-  { id: "guardrails", label: "The safety net", tech: "Deterministic Python rules", mark: "✓", detail: "The backend compares the trainee's itinerary against confirmed rules. It blocks a risky confirm before saving and sends the expert's words and screen evidence to the tutor.", sample: 'checked_bag && connection_min < 75\n→ block confirm · explain why · try again' },
+  { id: "guardrails", label: "The safety net", tech: "Python rules ? Z3 verification", mark: "✓", detail: "Python compares the trainee's itinerary against confirmed rules and blocks a risky confirm before saving. Z3 mirrors the rule semantics to check consistency, compare rule sets, and find the smallest changes that would make an option pass.", sample: 'checked_bag && connection_min < 75\n→ block confirm · explain why · try again' },
 ] as const;
 
 type NodeId = typeof NODES[number]["id"];
@@ -113,6 +113,7 @@ export default function StackDemo() {
     </section>
 
     {detail ? <section className="card stack-inspector fade-in" aria-label="Component details"><div><span className="label text-sky">Under the hood</span><h2 className="mt-2 text-2xl uppercase">{detail.tech}</h2><p className="mt-2 text-sm text-mute">{detail.detail}</p></div><pre><code>{detail.sample}</code></pre><button type="button" className="btn" onClick={() => setSelected(null)} aria-label="Close component details">Close ×</button></section> : <div className="stack-principles"><span><b>Voice</b> asks and teaches</span><span><b>Python</b> validates and enforces</span><span><b>The expert</b> confirms what is learned</span></div>}
+    <div className="card flex flex-wrap items-center gap-4 p-5"><div className="flex-1"><span className="label text-sky">Beyond the walkthrough</span><p className="mt-1 text-sm">Multilingual capture, what-if checks, and a benchmark of expert-rule extraction.</p></div><Link href="/benchmark" className="btn">Explore the benchmark ?</Link></div>
     <p className="text-xs text-mute">This tour illustrates the architecture with example events and quotes. It does not call providers or create a session. Live voice uses ElevenLabs tools; Cerebras is the optional backend extraction path.</p>
   </div>;
 }

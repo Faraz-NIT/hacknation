@@ -23,6 +23,8 @@ type StartOpts = {
   firstMessage: string;
   dynamicVariables?: Record<string, string>;
   tools: ToolMap;
+  /** ElevenAgents language override (needs "Language" enabled under the agent's Security → Overrides). */
+  language?: string;
 };
 
 export function useVoiceAgent(handlers: {
@@ -85,7 +87,10 @@ export function useVoiceAgent(handlers: {
       connectionType: "websocket",
       clientTools,
       dynamicVariables: opts.dynamicVariables,
-      ...(useOverrides ? { overrides: { agent: { prompt: { prompt: opts.prompt }, firstMessage: opts.firstMessage } } } : {}),
+      ...(useOverrides ? { overrides: { agent: {
+        prompt: { prompt: opts.prompt }, firstMessage: opts.firstMessage,
+        ...(opts.language && opts.language !== "en" ? { language: opts.language } : {}),
+      } } } : {}),
     };
     await navigator.mediaDevices.getUserMedia({ audio: true });
     conv.startSession(session);
@@ -140,7 +145,7 @@ export function useVoiceAgent(handlers: {
 }
 
 /** Browser dictation for the simulated engine (Chrome / Edge). */
-export function useDictation(onFinal: (text: string) => void) {
+export function useDictation(onFinal: (text: string) => void, lang = "en-US") {
   const [listening, setListening] = useState(false);
   const recRef = useRef<any>(null);
   const supported = typeof window !== "undefined" && !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
@@ -148,7 +153,7 @@ export function useDictation(onFinal: (text: string) => void) {
     const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     if (!SR) return;
     const rec = new SR();
-    rec.lang = "en-US";
+    rec.lang = lang;
     rec.interimResults = false;
     rec.continuous = false;
     rec.onresult = (e: any) => onFinal(Array.from(e.results).map((r: any) => r[0].transcript).join(" "));
@@ -157,7 +162,7 @@ export function useDictation(onFinal: (text: string) => void) {
     recRef.current = rec;
     rec.start();
     setListening(true);
-  }, [onFinal]);
+  }, [onFinal, lang]);
   const stop = useCallback(() => recRef.current?.stop(), []);
   return { supported, listening, start, stop };
 }

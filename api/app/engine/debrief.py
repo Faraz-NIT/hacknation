@@ -6,12 +6,18 @@ left to ask) and the expert confirmed the teach-back.
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from ..models import Case, LearnedRule
 from .rules import hhmm, risk_flags
 
 MIN_DEBRIEF_QUESTIONS = 3
+NO_EXCEPTION_TEXT = re.compile(r"^\s*(?:none|no exceptions?|n/?a)\b", re.IGNORECASE)
+
+
+def has_exception(text: str | None) -> bool:
+    return bool(text) and not NO_EXCEPTION_TEXT.match(text)
 
 
 def _present_categories(case: Case) -> set[str]:
@@ -46,7 +52,7 @@ def compute_gaps(case: Case, rules: list[LearnedRule], state: dict[str, Any]) ->
                 False, "connection_risk", r.rule_id, "exception")
     r = by_type.get("customer_deadline")
     if r:
-        if not r.threshold_min:
+        if r.threshold_min is None:  # 0 is a valid answer: "just land before the deadline"
             add(f"{r.rule_id}:threshold", f"For the {dl} deadline, how much margin do you need? Would landing at {near} be acceptable?",
                 True, "customer_deadline", r.rule_id, "threshold")
         if not r.exception:
@@ -100,12 +106,15 @@ def teachback(case: Case, rules: list[LearnedRule], state: dict[str, Any]) -> st
     parts = ["Here's how I understand it. When a passenger's flight is disrupted, you first check their constraints: "
              "checked bag, arrival deadline and the cabin they paid for."]
     if (r := by.get("connection_risk")):
-        exc = f" The exception: {r.exception}." if r.exception and not r.exception.startswith("none") else ""
+        exc = f" The exception: {r.exception.rstrip('.')}." if has_exception(r.exception) else ""
         parts.append(f"With a checked bag, you never book a connection under {r.threshold_min or '?'} minutes, "
                      f"because the bag or the passenger misses the transfer.{exc}")
     if (r := by.get("customer_deadline")):
-        margin = f" with at least {r.threshold_min} minutes of margin" if r.threshold_min else ""
-        parts.append(f"You rule out anything that lands after the passenger's deadline{margin}, even when it's cheaper.")
+        if r.threshold_min:
+            parts.append(f"You keep at least {r.threshold_min} minutes of margin: anything landing later than "
+                         f"{r.threshold_min} minutes before the passenger's deadline is out, even when it's cheaper.")
+        else:
+            parts.append("You rule out anything that lands after the passenger's deadline, even when it's cheaper.")
     if (r := by.get("authority_boundary")):
         parts.append(f"If the only workable option is a higher cabin, you stop and get approval from "
                      f"{r.escalation or 'a supervisor'} before ticketing; you never upgrade on your own.")

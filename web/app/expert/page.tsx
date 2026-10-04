@@ -5,6 +5,7 @@ import CaseBoard, { BoardView, emptyView } from "@/components/CaseBoard";
 import { AgentHeader, AnswerBox, GateMeter, Line, Transcript } from "@/components/AgentPanel";
 import { Alternative, api, Debrief, Question, Rule, Score, Session, Snapshot } from "@/lib/api";
 import { apprenticeFirstMessage, apprenticePrompt } from "@/lib/prompts";
+import { LANGUAGES, LangCode } from "@/lib/languages";
 import { useTurnGate } from "@/lib/turnGate";
 import { useVoiceAgent, VoiceKind, VoiceProvider } from "@/lib/voice";
 
@@ -32,6 +33,7 @@ function Expert() {
   const [health, setHealth] = useState<Record<string, boolean> | null>(null);
   const [kindChoice, setKindChoice] = useState<VoiceKind>("simulated");
   const [expertName, setExpertName] = useState("Claire");
+  const [lang, setLang] = useState<LangCode>("en");
   const [session, setSession] = useState<Session | null>(null);
   const [phase, setPhase] = useState<Phase>("setup");
   const [view, setView] = useState<BoardView>(emptyView());
@@ -193,7 +195,7 @@ function Expert() {
   const start = async () => {
     setStarting(true); setError(null);
     try {
-      const s = await api.createSession({ mode: "expert", expert_name: expertName, live: true });
+      const s = await api.createSession({ mode: "expert", expert_name: expertName, live: true, language: lang });
       sid.current = s.session_id;
       setSession(s);
       const v = emptyView();
@@ -201,8 +203,8 @@ function Expert() {
       await api.event({ session_id: s.session_id, type: "case_opened", snapshot: snap(s, v) });
       await gate.startVad();
       await voice.start({
-        kind: kindChoice, mode: "expert", prompt: apprenticePrompt(expertName), firstMessage: apprenticeFirstMessage(expertName),
-        dynamicVariables: { expert_name: expertName }, tools,
+        kind: kindChoice, mode: "expert", prompt: apprenticePrompt(expertName, lang), firstMessage: apprenticeFirstMessage(expertName, lang),
+        dynamicVariables: { expert_name: expertName }, tools, language: lang,
       });
       setPhase("capture");
       if (kindChoice === "elevenlabs") {
@@ -352,6 +354,22 @@ function Expert() {
             <input className="mt-1 w-full rounded-lg border border-line bg-ink px-3 py-2" value={expertName} onChange={(e) => setExpertName(e.target.value)} />
           </label>
           <div>
+            <span className="label">Expert speaks</span>
+            <div className="mt-1 flex flex-wrap gap-2">
+              {(Object.keys(LANGUAGES) as LangCode[]).map((code) => (
+                <button key={code} className={`btn ${lang === code ? "btn-primary" : ""}`} onClick={() => setLang(code)}>
+                  {LANGUAGES[code].native}
+                </button>
+              ))}
+            </div>
+            {lang !== "en" && (
+              <p className="mt-1.5 text-xs text-mute">
+                The apprentice asks in {LANGUAGES[lang].name}. Rules are stored in English, and the tutor teaches the new hire in English, translating your quotes.
+                {kindChoice === "simulated" && " The simulated voice still speaks English; you can answer in " + LANGUAGES[lang].name + "."}
+              </p>
+            )}
+          </div>
+          <div>
             <span className="label">Voice engine</span>
             <div className="mt-1 flex gap-2">
               <button className={`btn ${kindChoice === "elevenlabs" ? "btn-primary" : ""}`} disabled={!health?.elevenlabs} onClick={() => setKindChoice("elevenlabs")}>
@@ -402,11 +420,11 @@ function Expert() {
             <GateMeter gate={gate} pending={pending?.text ?? null} awaiting={!!awaiting} offRecord={offRecord} micOpen={voice.kind === "simulated" ? askStage === "listening" : voice.micOpen} />
           )}
           {phase === "capture" && voice.kind === "simulated" && askStage === "listening" && (
-            <AnswerBox onSubmit={submitCaptureAnswer} placeholder="Answer the apprentice (type or dictate)…" />
+            <AnswerBox onSubmit={submitCaptureAnswer} placeholder="Answer the apprentice (type or dictate)…" lang={LANGUAGES[lang].speech} />
           )}
           {phase !== "capture" && debrief && (
             <DebriefPanel d={debrief} kind={voice.kind} phase={phase} onAnswer={submitGapAnswer} onCorrect={submitCorrection}
-                          onConfirm={confirmTeachback} sessionId={session!.session_id} />
+                          onConfirm={confirmTeachback} sessionId={session!.session_id} lang={LANGUAGES[lang].speech} />
           )}
           <Transcript lines={lines} />
           {error && <div className="text-xs text-red">{error}</div>}
@@ -468,9 +486,9 @@ function RulesPanel({ rules }: { rules: Rule[] }) {
   );
 }
 
-function DebriefPanel({ d, kind, phase, onAnswer, onCorrect, onConfirm, sessionId }: {
+function DebriefPanel({ d, kind, phase, onAnswer, onCorrect, onConfirm, sessionId, lang }: {
   d: Debrief; kind: VoiceKind; phase: Phase; onAnswer: (t: string) => void; onCorrect: (t: string) => void;
-  onConfirm: () => void; sessionId: string;
+  onConfirm: () => void; sessionId: string; lang: string;
 }) {
   const [correcting, setCorrecting] = useState(false);
   if (phase === "done" || d.complete) {
@@ -497,7 +515,7 @@ function DebriefPanel({ d, kind, phase, onAnswer, onCorrect, onConfirm, sessionI
           <div className="rounded border border-amber/40 bg-amber/5 p-2 text-amber">
             {gap.mandatory && <span className="chip mr-2 border-amber/40 text-[9px]">MUST CLOSE</span>}{gap.question}
           </div>
-          {kind === "simulated" && <AnswerBox key={gap.gap_id} onSubmit={onAnswer} />}
+          {kind === "simulated" && <AnswerBox key={gap.gap_id} onSubmit={onAnswer} lang={lang} />}
         </>
       )}
       {d.ready_for_teachback && d.teachback && (
@@ -508,7 +526,7 @@ function DebriefPanel({ d, kind, phase, onAnswer, onCorrect, onConfirm, sessionI
             <button className="btn btn-primary" onClick={onConfirm}>Yes, that's how it works</button>
             {kind === "simulated" && <button className="btn" onClick={() => setCorrecting((x) => !x)}>Correct something</button>}
           </div>
-          {correcting && <AnswerBox onSubmit={(t) => { onCorrect(t); setCorrecting(false); }} placeholder='e.g. "Make it 90 minutes at Heathrow"' />}
+          {correcting && <AnswerBox onSubmit={(t) => { onCorrect(t); setCorrecting(false); }} placeholder='e.g. "Make it 90 minutes at Heathrow"' lang={lang} />}
         </>
       )}
     </div>

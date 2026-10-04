@@ -7,6 +7,7 @@ const destinations = [
   { href: "/workmap", number: "02", label: "Work Map" },
   { href: "/trainee", number: "03", label: "Teach" },
   { href: "/stack", number: "↗", label: "The stack" },
+  { href: "/benchmark", number: "04", label: "Benchmark" },
 ];
 
 export default function WorkspaceNav() {

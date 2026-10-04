@@ -97,11 +97,11 @@ export function Transcript({ lines }: { lines: Line[] }) {
   );
 }
 
-export function AnswerBox({ onSubmit, placeholder = "Type or dictate your answer…", disabled = false, autoFocus = true }: {
-  onSubmit: (text: string) => void; placeholder?: string; disabled?: boolean; autoFocus?: boolean;
+export function AnswerBox({ onSubmit, placeholder = "Type or dictate your answer…", disabled = false, autoFocus = true, lang }: {
+  onSubmit: (text: string) => void; placeholder?: string; disabled?: boolean; autoFocus?: boolean; lang?: string;
 }) {
   const [text, setText] = useState("");
-  const dict = useDictation((t) => setText((prev) => (prev ? prev + " " : "") + t));
+  const dict = useDictation((t) => setText((prev) => (prev ? prev + " " : "") + t), lang);
   const submit = () => { const t = text.trim(); if (!t) return; onSubmit(t); setText(""); };
   return (
     <div className="fade-in flex gap-2">
