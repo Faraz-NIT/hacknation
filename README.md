@@ -66,6 +66,44 @@ Set `USE_LIVE_ALTERNATIVES=1` to swap in live itineraries.
 **Design principle:** the agent is conversational, enforcement is deterministic. ElevenLabs owns
 listening, asking and teaching. Python owns rule matching and blocking (`api/app/engine/rules.py`).
 
+## Formal verification (Z3)
+
+`api/app/engine/verify.py` mirrors the guardrail evaluator as SMT constraints over the decision facts
+(checked bag, connection minutes, arrival margin, cabin change, approval). A test checks that the Z3
+encoding and the Python evaluator agree on 2,000 random bookings. On top of that:
+
+- **Counterfactuals**: when a confirm is blocked, Z3 finds the smallest change that would pass
+  ("allowed if the connection were at least 80 min, or the passenger had carry-on only"), one per strategy,
+  minimising the number of changed facts and then the minutes changed. Shown in the block modal, the
+  What-if panel and the tutor's `check_guardrail` result.
+- **Analysis** (`GET /api/verify/{session}?scope=session|team`): rules that can never fire, redundant or
+  duplicate rules, rules that disagree (with a concrete booking where they do), and the safe envelope the
+  rule set enforces (shortest allowed connection with a bag, tightest arrival, upgrades without approval).
+  `scope=team` checks every expert's confirmed rules together. Shown on the Work Map.
+- **Equivalence**: whether two rule sets block exactly the same bookings, with a counterexample if not.
+  The benchmark uses this to score learned rules against the hidden policy.
+
+## Benchmark
+
+`api/bench` runs simulated experts with random hidden policies (connection floor 60–105 min, deadline
+margin 0–45 min, one of three approvers, French / German / Hindi / English) through the real backend:
+capture, debrief, teach-back corrections, confirm. It scores the learned rules against the hidden policy
+(field accuracy, Z3 equivalence, unsafe allows on random bookings) and the effort it took.
+
+```bash
+cd api
+python -m bench.run --expert template --extractor heuristic --languages en,fr,de,hi --n 25   # free, offline
+python -m bench.run --expert template --extractor llm --languages en,fr,de,hi --n 4          # Cerebras extraction
+python -m bench.run --expert llm --extractor llm --languages en,fr,de,hi --n 1               # Cerebras expert too
+```
+
+The template expert answers from phrase templates (deterministic per seed, sometimes vague so the
+debrief has to ask). The LLM expert is a Cerebras persona that only sees the raw questions. A shared rate
+limiter keeps both under the Cerebras free tier (5 requests/minute). Results land in `bench/results/`
+and on the `/benchmark` page. The first runs found two bugs, both fixed and covered by `tests/test_bench.py`:
+"the station supervisor" was stored as "supervisor", and an expert needing no deadline margin could never
+finish the debrief.
+
 ## Repository
 
 ```
@@ -78,12 +116,15 @@ api/                      FastAPI + SQLite (JSON columns)
     store.py              rule persistence + provenance (event, transcript span, quote)
     debrief.py            gap validator + teach-back
     rules.py              decision facts + deterministic guardrail evaluator
+    verify.py             Z3 encoding of the guardrails: counterfactuals, consistency, equivalence
     workmap.py            Work Map + agent-ready markdown export
     tutor.py              interventions + mastery
     redact.py             PII redaction
   app/services/           live adapters (Bright Data, Aviationstack, Open-Meteo) + case engine
   app/fixtures/           case_A (expert, CDG→HND) and case_B (trainee, CDG→JFK)
   tests/test_flow.py      full Capture→Map→Teach loop
+  tests/test_verify.py    Z3 encoding cross-checked against the Python evaluator on random bookings
+  bench/                  benchmark: simulated experts with hidden rules (results/ is shown on /benchmark)
 web/                      Next.js + Tailwind
   app/expert              Capture + debrief
   app/workmap             clickable Work Map with screen replays
@@ -117,5 +158,9 @@ Hidden rules: minimum connection with a bag, protect the deadline, and a cabin c
   contract is source-agnostic, so a frame-diff vision path can feed the same `/api/events`.
 - Bright Data dataset schemas vary; check the normaliser against your dataset.
 - Redaction is regex-based; swap in Microsoft Presidio for broader coverage.
-- Stretch goals that are cheap from here: German capture → English tutor (agent language override),
-  MCP tool for the tutor to query guardrails.
+- Multilingual capture: the expert can speak French, German or Hindi (picker on the Capture screen). Rules are
+  stored in English, quotes in the original language, and the tutor teaches in English, translating quotes.
+  The deterministic fallback extractor is English-only, so non-English capture needs `CEREBRAS_API_KEY`.
+- "What if" checks: the tutor's `check_guardrail` tool (and the What-if panel on the Teach screen) runs the
+  expert's guardrails on a hypothetical option via `POST /api/guardrails/whatif`. Nothing is stored.
+- Stretch goal that is cheap from here: an MCP tool so other agents can query the guardrails.

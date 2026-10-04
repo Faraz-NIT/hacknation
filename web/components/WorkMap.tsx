@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import CaseBoard, { emptyView } from "@/components/CaseBoard";
 import { api, Case } from "@/lib/api";
+import VerificationPanel from "@/components/Verification";
 
 const TYPE_ICON: Record<string, string> = {
   case_opened: "◎", alternative_rejected: "✕", alternative_selected: "✓", escalation_requested: "⇡", rebook_confirmed: "■",
@@ -139,6 +140,8 @@ export default function WorkMap({ sessionId }: { sessionId: string }) {
           </div>
         </div>
       )}
+
+      <VerificationPanel sessionId={sessionId} expertName={wm.expert_name} />
     </div>
   );
 }

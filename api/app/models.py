@@ -92,6 +92,7 @@ class SessionCreate(BaseModel):
     expert_name: str = "Claire"
     expert_session_id: Optional[str] = None
     live: bool = True
+    language: Literal["en", "fr", "de", "hi"] = "en"  # language the expert speaks in capture
 
 
 class EventIn(BaseModel):
@@ -187,6 +188,18 @@ class ActionIn(BaseModel):
     session_id: str
     type: Literal["confirm", "select"] = "confirm"
     option_id: str
+    has_supervisor_approval: bool = False
+
+
+class WhatIfIn(BaseModel):
+    """Hypothetical guardrail check for the tutor's `check_guardrail` tool. Nothing is stored."""
+
+    session_id: str
+    option_id: str
+    connection_min: Optional[int] = None
+    arrival: Optional[str] = Field(None, pattern=r"^\d{1,2}:\d{2}$")  # "HH:MM"
+    cabin: Optional[Literal["economy", "premium_economy", "business", "first"]] = None
+    checked_bag: Optional[bool] = None
     has_supervisor_approval: bool = False
 
 

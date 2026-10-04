@@ -4,6 +4,7 @@ Run:  uvicorn app.main:app --reload --port 8000
 """
 from __future__ import annotations
 
+import json
 import logging
 import os
 import time
@@ -18,13 +19,13 @@ from pydantic import BaseModel
 
 from . import db
 from .engine import debrief as debrief_engine
-from .engine import extraction, scoring, tutor, workmap
+from .engine import extraction, scoring, tutor, verify, workmap
 from .engine.redact import redact
-from .engine.rules import evaluate, refresh
+from .engine.rules import evaluate, explain_facts, refresh
 from .engine.store import get_rule, load_case, record, rules_for, save_rule
 from .models import (
     ActionIn, ConfirmIn, EventIn, ExtractIn, GapAnswerIn, RuleCorrectionIn,
-    RuleRecordIn, SessionCreate, TraineeAnswerIn, TranscriptIn,
+    RuleRecordIn, SessionCreate, TraineeAnswerIn, TranscriptIn, WhatIfIn,
 )
 from .services import cases, live
 
@@ -113,12 +114,15 @@ def create_session(body: SessionCreate):
     case_id = body.case_id or cases.CASE_FOR_MODE[body.mode]
     case = cases.build_case(case_id, use_live=body.live)
     sid = db.new_id("S" if body.mode == "expert" else "T")
-    state: dict[str, Any] = {"expert_name": body.expert_name, "answered_gaps": [], "corrections": 0}
+    state: dict[str, Any] = {"expert_name": body.expert_name, "answered_gaps": [], "corrections": 0,
+                             "language": body.language}
     expert_sid = None
     if body.mode == "trainee":
         expert_sid = body.expert_session_id or _latest_expert()
         if expert_sid:
-            state["expert_name"] = db.get_state(expert_sid).get("expert_name", body.expert_name)
+            expert_state = db.get_state(expert_sid)
+            state["expert_name"] = expert_state.get("expert_name", body.expert_name)
+            state["expert_language"] = expert_state.get("language", "en")
         state.update({"predictions": [], "explanations": []})
     db.execute(
         "INSERT INTO sessions (id, mode, created, case_json, expert_session_id, state_json) VALUES (?,?,?,?,?,?)",
@@ -192,7 +196,9 @@ def agent_context(session_id: str):
     out: dict[str, Any] = {"text": text, "mode": s["mode"]}
     if s["mode"] == "trainee" and s["expert_session_id"]:
         rules = [r for r in rules_for(s["expert_session_id"]) if r.expert_confirmed]
-        out["expert_name"] = db.get_state(session_id).get("expert_name")
+        state = db.get_state(session_id)
+        out["expert_name"] = state.get("expert_name")
+        out["expert_language"] = state.get("expert_language", "en")
         out["rules_text"] = " ".join(f"[{r.rule_id}] {r.guardrail} (expert: \"{r.quote}\")" for r in rules)
     return out
 
@@ -356,6 +362,8 @@ def correct_rule(body: RuleCorrectionIn):
             body.threshold_minutes = body.threshold_minutes or p.threshold_minutes
             body.escalation = body.escalation or p.escalation
             body.exception = body.exception or p.exception
+        if not body.exception and extraction.NO_EXCEPTION.search(body.text):
+            body.exception = "none - expert says no exceptions"  # lets a correction clear a wrong exception
         elif target_type is None:
             # Category unclear: a bare number most likely corrects the connection floor.
             n = extraction.find_threshold(body.text) or extraction._bare_number(body.text)
@@ -412,9 +420,13 @@ def answer_gap(body: GapAnswerIn):
             fields["escalation"] = body.escalation
         elif gap["field"] == "exception":
             fields["exception"] = body.exception
-        if not any(fields.values()):
+        if not any(v is not None for v in fields.values()):
             fields = extraction.merge_into({}, answer, gap["field"])
-        if fields.get("threshold_minutes"):
+        zero_ok = gap["category"] == "customer_deadline"  # "no margin, just land before it" is a real answer
+        if zero_ok and gap["field"] == "threshold" and not fields.get("threshold_minutes") \
+                and extraction.NO_MARGIN.search(answer):
+            fields["threshold_minutes"] = 0
+        if fields.get("threshold_minutes") or (zero_ok and fields.get("threshold_minutes") == 0):
             rule.threshold_min = fields["threshold_minutes"]
         if fields.get("escalation"):
             rule.escalation = fields["escalation"]
@@ -427,7 +439,8 @@ def answer_gap(body: GapAnswerIn):
                 rule.quote = answer
         rule.confidence = round(min(0.95, rule.confidence + 0.05), 2)
         save_rule(rule)
-        resolved = (gap["field"] != "threshold" or rule.threshold_min) and (gap["field"] != "escalation" or rule.escalation)
+        has_threshold = rule.threshold_min is not None if zero_ok else bool(rule.threshold_min)
+        resolved = (gap["field"] != "threshold" or has_threshold) and (gap["field"] != "escalation" or rule.escalation)
     elif gap["gap_id"].startswith("missing:"):
         cat = gap["category"]
         props = [p for p in extraction.extract(answer) if p.decision_type == cat] or \
@@ -495,6 +508,8 @@ def evaluate_action(body: ActionIn):
         "violations": [tutor.intervention(case, r, facts, expert_name) for r in violations],
         "warnings": [tutor.intervention(case, r, facts, expert_name) for r in warnings],
         "rules_checked": len(rules),
+        "counterfactuals": verify.counterfactuals(case, body.option_id, [r for r in rules if r.expert_confirmed],
+                                                  body.has_supervisor_approval) if violations else [],
     }
     if s["mode"] == "trainee":
         ts = db.session_ts(body.session_id)
@@ -508,6 +523,70 @@ def evaluate_action(body: ActionIn):
                               "approval": body.has_supervisor_approval}
             db.set_state(body.session_id, state)
     return payload
+
+
+@app.post("/api/guardrails/whatif")
+def what_if(body: WhatIfIn):
+    """Run the expert's guardrails on a hypothetical variant of an option. Read-only."""
+    s = _session(body.session_id)
+    case = load_case(body.session_id).model_copy(deep=True)
+    source = s["expert_session_id"] if s["mode"] == "trainee" else body.session_id
+    rules = rules_for(source) if source else []
+    opt = case.option(body.option_id)
+    changed = {}
+    for field in ("connection_min", "arrival", "cabin"):
+        value = getattr(body, field)
+        if value is not None:
+            setattr(opt, field, value)
+            changed[field] = value
+    if body.checked_bag is not None:
+        case.passenger.checked_bag = body.checked_bag
+        changed["checked_bag"] = body.checked_bag
+    violations, warnings, facts = evaluate(case, body.option_id, rules, body.has_supervisor_approval)
+
+    def brief(r):
+        return {"rule_id": r.rule_id, "title": r.title, "guardrail": r.guardrail,
+                "why": explain_facts(r, case, facts), "expert_quote": r.quote}
+
+    return {"option_id": body.option_id, "changed": changed, "allowed": not violations,
+            "violations": [brief(r) for r in violations], "draft_warnings": [brief(r) for r in warnings],
+            "would_pass_if": verify.counterfactuals(case, body.option_id, [r for r in rules if r.expert_confirmed],
+                                                    body.has_supervisor_approval) if violations else [],
+            "facts": facts, "rules_checked": len(rules)}
+
+
+BENCH_RESULTS = Path(__file__).resolve().parent.parent / "bench" / "results"
+
+
+@app.get("/api/bench")
+def bench_results():
+    """Committed benchmark runs (api/bench/results/*.json), newest first."""
+    runs = []
+    for path in sorted(BENCH_RESULTS.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True):
+        data = json.loads(path.read_text())
+        runs.append({"name": path.stem, **data})
+    return runs
+
+
+@app.get("/api/verify/{session_id}")
+def verify_rules(session_id: str, scope: str = "session"):
+    """Z3 analysis of the learned guardrails. scope=team checks every expert's confirmed rules together."""
+    s = _session(session_id)
+    if scope == "team":
+        rows = db.query("SELECT id FROM sessions WHERE mode='expert'")
+        rules = [r for row in rows for r in rules_for(row["id"]) if r.expert_confirmed]
+    else:
+        source = s["expert_session_id"] if s["mode"] == "trainee" else session_id
+        rules = rules_for(source) if source else []
+    report = verify.analyze(rules)
+    case = load_case(session_id)
+    confirmed = [r for r in rules if r.expert_confirmed]
+    report["options"] = [{"option_id": a.id, "label": a.label,
+                          "allowed": not evaluate(case, a.id, confirmed)[0],
+                          "would_pass_if": verify.counterfactuals(case, a.id, confirmed)}
+                         for a in case.alternatives]
+    report["scope"] = scope
+    return report
 
 
 # ------------------------------------------------------------------- trainee

@@ -4,7 +4,7 @@ import tempfile
 
 os.environ["SKYMENTOR_OFFLINE"] = "1"
 os.environ["SKYMENTOR_DATA_DIR"] = tempfile.mkdtemp()
-os.environ.pop("CEREBRAS_API_KEY", None)
+os.environ["CEREBRAS_API_KEY"] = ""  # empty, not unset: app startup loads api/.env with setdefault
 
 from fastapi.testclient import TestClient  # noqa: E402
 
@@ -101,6 +101,7 @@ def test_full_loop():
     assert p["correct"]
     r = c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "A"}).json()
     assert not r["allowed"] and r["violations"][0]["decision_type"] == "connection_risk"
+    assert {"connection_min": 80} in [cf["changes"] for cf in r["counterfactuals"]]
     assert r["violations"][0]["screen_moment"]["option_id"] == "A"
     assert c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "C"}).json()["allowed"] is False
     upgrade = c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "D"}).json()
@@ -120,6 +121,30 @@ def test_full_loop():
                                            "text": "I don't know"}).json()
     assert not e["correct"] and e["rule_id"] == upgrade_rule_id
     assert c.post("/api/guardrails/evaluate", json={"session_id": tid, "option_id": "B"}).json()["allowed"]
+    # What-if: the tutor's hypothetical check uses the same guardrails and stores nothing.
+    wi = lambda **kw: c.post("/api/guardrails/whatif", json={"session_id": tid, **kw})
+    r = wi(option_id="A").json()
+    assert not r["allowed"] and r["violations"][0]["title"] == conn_rule["title"]
+    assert "48-minute" in r["violations"][0]["why"]
+    assert any(cf["changes"] == {"checked_bag": False} for cf in r["would_pass_if"])
+    assert wi(option_id="A", connection_min=90).json()["allowed"]
+    assert wi(option_id="A", checked_bag=False).json()["allowed"]
+    late = wi(option_id="B", arrival="23:59").json()
+    assert not late["allowed"] and late["changed"] == {"arrival": "23:59"}
+    assert wi(option_id="B", arrival="late").status_code == 422
+    assert c.get(f"/api/sessions/{tid}/context").json()["expert_language"] == "en"
+
+    v = c.get(f"/api/verify/{tid}").json()
+    assert v["consistent"] and v["rules_checked"] == 3 and v["envelope"]["shortest_connection_with_bag"] == 80
+    assert [o["option_id"] for o in v["options"] if o["allowed"]] == ["B"]
+    assert c.get(f"/api/verify/{tid}?scope=team").json()["rules_checked"] == 3
+
     m = c.get(f"/api/mastery/{tid}").json()
     assert m["finished"] and len(m["items"]) == 3
     print(m["summary"])
+
+
+def test_session_language():
+    s = c.post("/api/sessions", json={"mode": "expert", "expert_name": "Amélie", "language": "fr"}).json()
+    assert s["state"]["language"] == "fr"
+    assert c.post("/api/sessions", json={"mode": "expert", "language": "es"}).status_code == 422

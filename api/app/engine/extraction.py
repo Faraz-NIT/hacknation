@@ -41,7 +41,7 @@ BUFFER = re.compile(rf"{DUR}\s+(?:of\s+)?(?:buffer|margin|cushion|spare|before (
 
 ESCALATION = re.compile(
     r"\b(duty (?:manager|supervisor|officer)|shift (?:lead|supervisor|manager)|ops control|operations control|"
-    r"station manager|team lead|revenue desk|supervisor|my manager|the manager)\b",
+    r"station (?:manager|supervisor|lead)|team lead|revenue desk|supervisor|my manager|the manager)\b",
     re.IGNORECASE,
 )
 EXCEPTION = re.compile(r"\b(?:unless|except(?: when| if| for)?|only if|the (?:only )?exception (?:is|would be))\s+([^.;!?]+)", re.IGNORECASE)
@@ -96,6 +96,13 @@ def find_escalation(text: str) -> Optional[str]:
         return None
     who = m.group(1).lower().replace("my ", "").replace("the ", "")
     return who if who != "manager" else "the manager"
+
+
+NO_MARGIN = re.compile(
+    r"\bno (?:extra |additional )?(?:margin|buffer|cushion)|\b(?:just|only) (?:has|needs) to (?:land|arrive) before"
+    r"|\bzero (?:margin|buffer|minutes)|\bany ?time before (?:the|her|his|their) deadline",
+    re.IGNORECASE,
+)
 
 
 def find_exception(text: str) -> Optional[str]:
@@ -161,8 +168,12 @@ Return ONLY JSON: {"rules": [{"decision_type": "connection_risk|customer_deadlin
 "reason": "<the expert's reason, close to their words>", "threshold_minutes": int|null,
 "escalation": "<who must approve>"|null, "exception": "<stated exception>"|null, "confidence": 0-1}]}
 connection_risk = minimum connection time when a bag is checked (threshold = that minimum).
-customer_deadline = landing too late for the passenger's commitment (threshold = required margin before deadline, null if none stated).
+customer_deadline = landing too late for the passenger's commitment (threshold = required margin before deadline; 0 only if they explicitly say no margin/buffer is needed; null if they just say it must not land late).
 authority_boundary = upgrades / waivers / cabin changes needing someone's approval (escalation = who).
+exception = a stated exception, or "none" if they say there are no exceptions or that the rule applies even in the case raised
+(e.g. "even with carry-on only, never under 85 minutes"); null if not discussed.
+escalation = the specific role they named (e.g. "duty manager"); null if they only say it needs approval or sign-off.
+The expert may speak any language (e.g. French, German, Hindi). Always write reason, escalation and exception in English.
 Never invent thresholds, people or exceptions that were not said."""
 
 
