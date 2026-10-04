@@ -78,10 +78,35 @@ def weather_features(raw_current: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+MET_NO_UA = "SkyMentor/0.1 github.com/Faraz-NIT/hacknation"  # MET Norway requires an identifying User-Agent
+
+
+def _met_no_current(raw: dict[str, Any]) -> dict[str, Any]:
+    """Project a MET Norway locationforecast onto Open-Meteo's `current` keys."""
+    now = raw["properties"]["timeseries"][0]["data"]
+    d = now["instant"]["details"]
+    nxt = (now.get("next_1_hours") or {}).get("details", {})
+    return {
+        "temperature_2m": d.get("air_temperature"),
+        "wind_speed_10m": float(d.get("wind_speed") or 0) * 3.6,  # m/s -> km/h
+        "wind_gusts_10m": float(d.get("wind_speed_of_gust") or d.get("wind_speed") or 0) * 3.6,
+        "precipitation": nxt.get("precipitation_amount") or 0,
+        "snowfall": 0,
+    }
+
+
+def _why(exc: Exception) -> str:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return f"HTTP {exc.response.status_code}"
+    return type(exc).__name__
+
+
 def get_weather(iata: str) -> tuple[Optional[dict[str, Any]], str]:
+    """Open-Meteo, then MET Norway (both free, no key), then the last cached reading."""
     if iata not in AIRPORTS:
         return None, "unknown airport"
     lat, lon = AIRPORTS[iata]
+    errors = []
     try:
         r = httpx.get(
             "https://api.open-meteo.com/v1/forecast",
@@ -97,8 +122,22 @@ def get_weather(iata: str) -> tuple[Optional[dict[str, Any]], str]:
         norm = weather_features(raw.get("current", {}))
         _save("weather", iata, raw, norm)
         return norm, "live"
-    except Exception:
-        return _load("weather", iata)
+    except Exception as exc:
+        errors.append(f"open-meteo {_why(exc)}")
+    try:
+        r = httpx.get("https://api.met.no/weatherapi/locationforecast/2.0/complete",
+                      params={"lat": round(lat, 4), "lon": round(lon, 4)},
+                      headers={"User-Agent": MET_NO_UA}, timeout=TIMEOUT)
+        r.raise_for_status()
+        raw = r.json()
+        norm = weather_features(_met_no_current(raw))
+        _save("weather", iata, raw, norm)
+        return norm, "live (MET Norway)"
+    except Exception as exc:
+        errors.append(f"met.no {_why(exc)}")
+    log.warning("weather unavailable for %s: %s", iata, "; ".join(errors))
+    cached, label = _load("weather", iata)
+    return cached, label if cached else f"unavailable ({'; '.join(errors)})"
 
 
 # ---------------------------------------------------------------- flight status
