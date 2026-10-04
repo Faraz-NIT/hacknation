@@ -87,6 +87,38 @@ export default function CaseBoard({
           {view.confirmed && <span className="chip confirmation-chip text-green border-green/40" role="status">✓ Rebooked on option {view.confirmed}</span>}
         </div>
       )}
+      {!compact && c.market?.length > 0 && <MarketFares c={c} />}
+    </div>
+  );
+}
+
+type MarketFare = { id: string; label: string; carrier: string; connection_min: number; departure: string;
+                    arrival: string; price_eur: number; note?: string | null };
+
+/** Live public fares for the same route. Context only: they never replace the case's options. */
+function MarketFares({ c }: { c: Case }) {
+  const fares = c.market as unknown as MarketFare[];
+  return (
+    <div className="card p-4">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="label">Market fares · {c.origin} → {c.destination}</div>
+        <Provenance label={c.provenance.market} />
+        <span className="ml-auto text-xs text-mute">Public fares from Google Flights, 1 checked bag. Context only, not bookable here.</span>
+      </div>
+      <div className="mt-2 overflow-x-auto">
+        <table className="w-full min-w-[520px] text-sm">
+          <tbody>
+            {fares.map((f) => (
+              <tr key={f.id} className="border-t border-line first:border-t-0">
+                <td className="py-1.5 pr-3">{f.carrier}</td>
+                <td className="pr-3 text-mute">{f.label}{f.connection_min ? ` · ${f.connection_min} min` : ""}</td>
+                <td className="num pr-3">{f.departure} → {f.arrival}{f.note?.includes("+1") ? <sup className="text-mute"> +1</sup> : null}</td>
+                <td className="num pr-3 text-right font-semibold">€{f.price_eur.toLocaleString()}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }

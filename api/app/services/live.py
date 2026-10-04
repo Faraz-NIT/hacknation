@@ -17,9 +17,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Optional
 
+import logging
+
 import httpx
 
 from ..db import DATA_DIR
+
+log = logging.getLogger("skymentor")
 
 CACHE_DIR = DATA_DIR / "cache"
 TIMEOUT = float(os.environ.get("LIVE_TIMEOUT_S", "6"))
@@ -184,14 +188,129 @@ def normalize_brightdata(raw: Any) -> list[dict[str, Any]]:
     return out
 
 
+# ---------------------------------------------------------- Google Flights (free)
+GOOGLE_FLIGHTS_URL = "https://www.google.com/travel/flights"
+# Pre-accepted consent: without it, EU traffic gets the "Before you continue" page.
+GOOGLE_CONSENT = {"SOCS": "CAESEwgDEgk0ODE3Nzk3MjQaAmVuIAEaBgiA_LyaBg", "CONSENT": "YES+cb"}
+
+
+def _configured(value: Optional[str]) -> bool:
+    return bool(value) and not value.startswith("your-")
+
+
+def brightdata_configured() -> bool:
+    return _configured(os.environ.get("BRIGHTDATA_API_TOKEN")) and _configured(os.environ.get("BRIGHTDATA_FLIGHTS_DATASET_ID"))
+
+
+def google_flights_enabled() -> bool:
+    if os.environ.get("FARES_SOURCE", "google") != "google":
+        return False
+    try:
+        import fast_flights  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
+def _hhmm_pair(value: Any) -> str:
+    padded = [*(value or []), None, None]  # Google omits zero components: [8] = 08:00
+    return f"{padded[0] or 0:02d}:{padded[1] or 0:02d}"
+
+
+def parse_google_flights(html: str) -> list[dict[str, Any]]:
+    """Itineraries from the Google Flights results page (the `ds:1` data blob).
+
+    Same payload layout as the fast-flights parser, but itineraries with a
+    missing price or odd shape are skipped instead of failing the whole page.
+    """
+    marker = html.find("AF_initDataCallback({key: 'ds:1'")
+    if marker < 0:
+        raise ValueError("no ds:1 payload (consent page or layout change)")
+    blob = html[marker:].split("data:", 1)[1]
+    payload, _ = json.JSONDecoder().raw_decode(blob)
+    out: list[dict[str, Any]] = []
+    for item in (payload[3][0] or []) if payload[3] else []:
+        try:
+            itin, price = item[0], item[1][0][1]
+            legs = itin[2]
+            stops = []
+            for prev, nxt in zip(legs, legs[1:]):
+                arr = datetime(*prev[21], *[int(x) for x in _hhmm_pair(prev[10]).split(":")])
+                dep = datetime(*nxt[20], *[int(x) for x in _hhmm_pair(nxt[8]).split(":")])
+                stops.append({"hub": prev[6], "hub_city": _short_airport(prev[5]), "minutes": int((dep - arr).total_seconds() // 60)})
+            out.append({
+                "price_eur": int(price), "airlines": list(itin[1]), "stops": stops,
+                "departure": _hhmm_pair(legs[0][8]), "arrival": _hhmm_pair(legs[-1][10]),
+                "overnight": tuple(legs[-1][21]) != tuple(legs[0][20]),
+            })
+        except (IndexError, TypeError, ValueError):
+            continue
+    return out
+
+
+def _short_airport(name: str) -> str:
+    for suffix in (" International Airport", " Airport", " International"):
+        name = name.replace(suffix, "")
+    return name.strip()
+
+
+def normalize_google_flights(itineraries: list[dict[str, Any]], limit: int = 6) -> list[dict[str, Any]]:
+    out = []
+    for i, it in enumerate(itineraries[:limit]):
+        stops = it["stops"]
+        shortest = min(stops, key=lambda s: s["minutes"]) if stops else None  # riskiest connection
+        notes = [f"{len(stops)} stops" if len(stops) > 1 else "", "+1 day" if it["overnight"] else ""]
+        out.append({
+            "id": chr(ord("A") + i),
+            "label": f"via {' + '.join(s['hub_city'] for s in stops)}" if stops else "Nonstop",
+            "hub": shortest["hub"] if shortest else "-",
+            "hub_city": shortest["hub_city"] if shortest else "Nonstop",
+            "carrier": ", ".join(it["airlines"]) or "Unknown",
+            "alliance": "",
+            "departure": it["departure"],
+            "arrival": it["arrival"],
+            "connection_min": shortest["minutes"] if shortest else 0,
+            "price_eur": it["price_eur"],
+            "cabin": "economy",
+            "note": ", ".join(n for n in notes if n) or None,
+        })
+    return out
+
+
+def search_google_flights(origin: str, destination: str, date: str) -> list[dict[str, Any]]:
+    """Free Google Flights search: fast-flights builds the query, we fetch and parse."""
+    import fast_flights as ff
+    from primp import Client
+
+    query = ff.create_query(flights=[ff.FlightQuery(date=date, from_airport=origin, to_airport=destination)],
+                            trip="one-way", currency="EUR", checked_bags=1)
+    client = Client(impersonate="chrome_145", impersonate_os="macos", referer=True, cookie_store=True,
+                    timeout=float(os.environ.get("GOOGLE_FLIGHTS_TIMEOUT_S", "15")))
+    client.set_cookies("https://www.google.com", GOOGLE_CONSENT)
+    html = client.get(GOOGLE_FLIGHTS_URL, params={**query.params(), "hl": "en", "gl": "us"}).text
+    return parse_google_flights(html)
+
+
 def search_alternatives(origin: str, destination: str, date: Optional[str] = None) -> tuple[Optional[list[dict[str, Any]]], str]:
+    """Live public fares: Bright Data if configured, else free Google Flights, else cache."""
     key = f"{origin}_{destination}"
+    date = date or (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d")
+    if not brightdata_configured():
+        if not google_flights_enabled():
+            cached, label = _load("flights", key)
+            return cached, label if cached else "no source"
+        try:
+            raw = search_google_flights(origin, destination, date)
+            norm = normalize_google_flights(raw)
+            if len(norm) < 2:
+                raise ValueError("too few itineraries parsed")
+            _save("flights", key, raw, norm)
+            return norm, "live"
+        except Exception as exc:
+            log.warning("google flights failed for %s: %s", key, exc)
+            return _load("flights", key)
     token = os.environ.get("BRIGHTDATA_API_TOKEN")
     dataset = os.environ.get("BRIGHTDATA_FLIGHTS_DATASET_ID")
-    if not (token and dataset):
-        cached, label = _load("flights", key)
-        return cached, label if cached else "no key"
-    date = date or (datetime.utcnow() + timedelta(days=1)).strftime("%Y-%m-%d")
     template = os.environ.get(
         "BRIGHTDATA_FLIGHTS_INPUT",
         '[{"url": "https://www.google.com/travel/flights?q=Flights%20from%20{origin}%20to%20{destination}%20on%20{date}%20one%20way"}]',

@@ -85,7 +85,9 @@ def health():
             "elevenlabs_signed": bool(os.environ.get("ELEVENLABS_API_KEY")),
             "cerebras_extraction": bool(os.environ.get("CEREBRAS_API_KEY")),
             "aviationstack": bool(os.environ.get("AVIATIONSTACK_KEY")),
-            "brightdata": bool(os.environ.get("BRIGHTDATA_API_TOKEN") and os.environ.get("BRIGHTDATA_FLIGHTS_DATASET_ID")),
+            "brightdata": live.brightdata_configured(),
+            "google_flights": not live.brightdata_configured() and live.google_flights_enabled()
+                              and os.environ.get("SKYMENTOR_OFFLINE") != "1",
             "open_meteo": os.environ.get("SKYMENTOR_OFFLINE") != "1",
         },
         "offline": os.environ.get("SKYMENTOR_OFFLINE") == "1",
