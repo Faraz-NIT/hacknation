@@ -36,7 +36,7 @@ export default function Home() {
           <p className="hero-description">Turn the decisions only your best people know how to make into knowledge your whole team can use.</p>
           <div className="mt-7 flex flex-wrap items-center gap-4">
             <Link href="/expert" className="btn btn-primary hero-cta">Enter the expert workspace <span aria-hidden="true">↗</span></Link>
-            <span className="font-mono text-[10px] uppercase text-board-foreground/55">Capture. Map. Pass it on.</span>
+            <Link href="/stack" className="hero-stack-link">Watch how it works <span aria-hidden="true">→</span></Link>
           </div>
           <div className="hero-footer"><span>Built for the moments that matter</span><span>Hack-Nation × ElevenLabs</span></div>
         </div>
