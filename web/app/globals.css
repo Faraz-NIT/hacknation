@@ -400,6 +400,8 @@ h1, h2, h3 { font-family: var(--font-display); font-weight: 400; }
   .stack-timeline { padding-inline: 16px; }
   .stack-narrative h2 { font-size: 29px; }
   .workspace-nav a { padding-inline: 6px; gap: 5px; font-size: 10px; }
+  .workspace-nav { overflow-x: auto; justify-content: flex-start; overscroll-behavior-x: contain; }
+  .workspace-nav a { flex: 0 0 auto; }
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
